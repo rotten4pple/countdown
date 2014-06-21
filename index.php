@@ -23,6 +23,18 @@ $form_values = fill_in_gaps();
 
 <input type="text" name="target_number" maxlength="3" class="number" value="<?php echo $form_values['target']; ?>" />
 
+using
+<select name="top_line" >
+<?php
+for( $tlidx = 0 ; $tlidx < 4 ; $tlidx++ ) {
+    // Note: $form_values['top_line'] will always be populated, so we don't have to test if it's set.
+    $selected = ( $tlidx == $form_values['top_line'] ? 'selected="selected" ' : '' );
+    echo '<option value="' . $tlidx . '" ' . $selected . '>' . $tlidx . '</option>';
+}
+?>
+</select>
+from the top line.
+
 <h2 >Enter the 6 numbers, or leave blank for the computer to choose</h2>
 
 <?php
@@ -47,7 +59,17 @@ if ( $form_values['submitted'] ) {
     if ( $form_values['any_gaps'] ) {
         echo '<p >The gaps were filled in with random numbers. Press Go to process...</p>';
     } else {
-        process_form();
+        // Validate the entries.
+        if ( $form_values['top_line'] == $form_values['from']['top'] ) {
+            if ( 0 == $form_values['from']['nowhere'] ) {
+                // All valid, so process the form.
+                process_form();
+            } else {
+                echo '<p class="error" >Error: ' . $form_values['from']['nowhere'] . ' number(s) is/are invalid.</p>';
+            }
+        } else {
+            echo '<p class="error" >Error: Incorrect number of numbers from the top line.</p>';
+        }
     }
 }
 
@@ -64,6 +86,8 @@ function fill_in_gaps() {
     // Initialise the return value (array). We ovewrite it with either entered values or random ones.
     $form_fields = array();
     $form_fields['target'] = NULL;
+    $form_fields['top_line'] = 1;  // Default to 1 from the top line.
+    $form_fields['from'] = array( 'top' => 0, 'anywhere' => 0, 'nowhere' => 0 );  // Records where the numbers come from.
     $form_fields['user_numbers'] = array();
     for( $i = 0 ; $i < 6 ; $i++ ) {
         $form_fields['user_numbers'][$i] = NULL;
@@ -82,20 +106,42 @@ function fill_in_gaps() {
             $form_fields['any_gaps'] = TRUE;
             $form_fields['target'] = rand( 100, 999 );
         }
+        $form_fields['top_line'] = $_POST['top_line'];
+        
+        // We need to count how many of the numbers submitted in the form are in the set 1-10, and
+        // how many are 25, 50, 75 or 100. We also count how many are in neither!
+        // Later, if we generate numbers, we need to make sure the target number of numbers from each
+        // place is hit.
+        for( $i = 0 ; $i < 6 ; $i++ ) {
+            if ( '' != $_POST['given_number'][$i] ) {
+                $this_number = $_POST['given_number'][$i];
+                // Increment the appropriate counter.
+                if ( 25 == $this_number || 50 == $this_number || 75 == $this_number || 100 == $this_number ) {
+                    $form_fields['from']['top']++;
+                } elseif ( 1 <= $this_number && 10 >= $this_number ) {
+                    $form_fields['from']['anywhere']++;
+                } else {
+                    $form_fields['from']['nowhere']++;
+                }
+            }
+        }
+        
         
         for( $i = 0 ; $i < 6 ; $i++ ) {
-            if ( array_key_exists( 'given_number', $_POST ) && '' != $_POST['given_number'][$i] ) {
+            if ( '' != $_POST['given_number'][$i] ) {
                 $form_fields['user_numbers'][$i] = $_POST['given_number'][$i];
             } else {
                 $form_fields['any_gaps'] = TRUE;
-                // User number is blank. We want either a number in the set { 25, 50, 75, 100} (1 in 3 chance)
-                // or a number between 1 and 10 (2 in 3 chance).
-                // TODO: We need to be more clever - there should always be either 1 or 2 numbers in that first set.
-                $large = rand( 1, 3 );
-                if ( 1 == $large ) {
+                // User number is blank. We want either a number in the set { 25, 50, 75, 100 }
+                // or a number between 1 and 10. The user's choice of how many numbers to take from
+                // the top line, and the number we already have from the top line, determine which
+                // set we take the number from.
+                if ( $form_fields['from']['top'] < $_POST['top_line'] ) {
                     $form_fields['user_numbers'][$i] = 25 * rand( 1, 4 );
+                    $form_fields['from']['top']++;
                 } else {
                     $form_fields['user_numbers'][$i] = rand( 1, 10 );
+                    $form_fields['from']['anywhere']++;
                 }
             }
         }

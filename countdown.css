@@ -1,3 +1,7 @@
 input.number {
     width: 40px;
 }
+
+p.error {
+    color: red;
+}
