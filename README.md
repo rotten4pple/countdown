@@ -7,10 +7,10 @@ You enter the 6 numbers and the target number (or get the computer to generate o
 
 The rules are that you can use each number a maximum of once each, and you can only use the basic operators ( + - * / ) and brackets.
 
-Example (with only 4 numbers):
+Example (with only 4 numbers):  
 Target: 44  
 Numbers: 5, 10, 2, 3  
-One solution:  5 * 10 - ( 2 * 3 )  
+One solution:  5 * 10 - ( 2 * 3 )
 
 My goals are:
 
