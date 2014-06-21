@@ -107,6 +107,11 @@ function fill_in_gaps() {
 // This is the guts of the page. It takes the 6 given numbers and tries to
 // find ways of combining them to reach the target number.
 function process_form() {
+    global $best_answer, $best_solution, $call_count;
+    
+    // Remember the current time so we can output how long we took to find a solution.
+    $start_time = microtime( TRUE );  // TRUE means return it as a float.
+    
     // Okay, the first solution will use each number once, and it won't do any fancy brackets.
     // It will just position the numbers in the 6! combinations, and they try every combination of +, -, * /
     // between them. Yes, that's 6! * 4^5 = ~750,000 combinations.
@@ -126,6 +131,10 @@ function process_form() {
                                             if ( $i1 != $i6 && $i2 != $i6 && $i3 != $i6 && $i4 != $i6 && $i5 != $i6 ) {
                                                 // Call another method to continue...
                                                 process_number_combo( array( $i1, $i2, $i3, $i4, $i5, $i6 ) );
+                                                // If we finished, skip to the end.
+                                                if ( isset( $best_answer ) && $best_answer == $_POST['target_number'] ) {
+                                                    break 6;  // Break out of all the for loops.
+                                                }
                                             }
                                         }
                                     }
@@ -137,9 +146,9 @@ function process_form() {
             }
         }
     }
+    $end_time = microtime( TRUE );  // TRUE means return it as a float.
     
     // Okay, let's see what we've ended up with.
-    global $best_answer, $best_solution;
     echo '<p >';
     if ( $best_answer == $_POST['target_number'] ) {
         echo 'Bingo! We hit the target!';
@@ -151,12 +160,20 @@ function process_form() {
     echo 'Solution: ' . $best_solution['solution'];
     echo '</p>';
     
+    echo '<p >';
+    $time_taken = round( $end_time - $start_time, 3 );
+    echo 'Time taken: ' . $time_taken . ' seconds.';
+    echo '<br />';
+    echo 'Expressions evaluated: ' . $call_count;
+    echo '</p>';
+    
 }
 
 // Method that receives 6 positions. We then generate the 4^5 combinations of operators and apply
 // them to see what number we get. If this answer is closer to the target than anything before,
 // remember this answer and all the combinations.
 function process_number_combo( $positions ) {
+    global $best_answer;
 // Just dump the positions.
 //echo '<br />';
 //for( $pidx = 0 ; $pidx < 6 ; $pidx++ ) {
@@ -170,6 +187,10 @@ function process_number_combo( $positions ) {
                 for( $o4 = 0 ; $o4 < 4 ; $o4++ ) {
                     for( $o5 = 0 ; $o5 < 4 ; $o5++ ) {
                         process_whole_expression( $positions, array( $o1, $o2, $o3, $o4, $o5 ) );
+                        // If we finished, skip to the end.
+                        if ( isset( $best_answer ) && $best_answer == $_POST['target_number'] ) {
+                            break 5;  // Break out of all the for loops.
+                        }
                     }
                 }
             }
@@ -184,8 +205,8 @@ function process_number_combo( $positions ) {
 function process_whole_expression( $positions, $operators ) {
     // TODO: We should do this in a class, then the "best so far information" could be private properties.
     //       We can also stop and skip to the end if we actually hit the solution.
-    global $best_answer, $best_solution;
-    global $call_count;
+    global $best_answer, $best_solution, $call_count;
+    $call_count = ( isset( $call_count ) ? $call_count : 0 );
     
     // We have to handle a division by zero. If it happens, we ignore the answer.
     // We also ignore the answer if it's a non-integer during the process.
@@ -223,7 +244,7 @@ $debug .= ' / ';
 $debug .= $next_part;
         $is_valid = $is_valid && ( $expr == floor( $expr ) );
     }
-//echo $debug . '!';
+//echo $debug;
     
 //echo '<br />Next answer: ' . $expr;
     // We have the value of this expression. If it's an integer, see if it's closer than the previous best.
@@ -239,7 +260,7 @@ echo '<br />Best so far: ' . $best_answer . '; ' . $solution;
         }
     }
 
-//$call_count = ( isset( $call_count ) ? $call_count + 1 : 1 );
+    $call_count++;
 //if ( 100000 < $call_count ) {
 //    die( 'Stopping' );
 //}
