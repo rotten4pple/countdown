@@ -59,7 +59,7 @@ class CountdownProblem {
                                                     // Call another method to continue...
                                                     $this->process_number_combo( array( $i0, $i1, $i2, $i3, $i4, $i5 ) );
                                                     // If we finished, skip to the end.
-                                                    if ( NULL != $this->best_answer && $this->best_answer == $this->target_number ) {
+                                                    if ( $this->areWeFinished() ) {
                                                         break 6;  // Break out of all the for loops.
                                                     }
                                                 }
@@ -100,7 +100,7 @@ class CountdownProblem {
                             $this->process_whole_expression( $positions, array( $o0, $o1, $o2, $o3, $o4 ) );
                             // If we finished, skip to the end.
                             // @TODO: Move this test into a separate method so we can call it everywhere.
-                            if ( NULL != $this->best_answer && $this->best_answer == $this->target_number ) {
+                            if ( $this->areWeFinished() ) {
                                 break 5;  // Break out of all the for loops.
                             }
                         }
@@ -129,10 +129,13 @@ class CountdownProblem {
         
         // We have to handle a division by zero. If it happens, we ignore the answer.
         // We also ignore the answer if it's a non-integer during the process.
+        // We test the value of the expression all the through the calculation, because we might be able
+        // to hit it without using all the given numbers.
         $is_valid = TRUE;
         $expr = $this->given_numbers[$positions[0]];
         $solution = $expr;
         $debug3 = '<br />This expression: ' . $expr;
+        $this->isBetterSolutionFound( $expr, TRUE, $solution, $positions, $operators, 0 );
         for( $oidx = 0 ; $oidx < 5 ; $oidx++ ) {
             $next_part = $this->given_numbers[$positions[1 + $oidx]];
             $solution = '( ' . $solution . ' ' . $op_to_text[$operators[$oidx]] . ' ' . $next_part . ' )';
@@ -161,27 +164,44 @@ class CountdownProblem {
             }
             $debug3 .= $next_part;
             $is_valid = $is_valid && ( $expr == floor( $expr ) );
+            $this->isBetterSolutionFound( $expr, $is_valid, $solution, $positions, $operators, 1 + $oidx );
         }
         if ( 4 < $this->debug_level ) {
             echo $debug3;
             echo ' gives: ' . $expr;
         }
         
+        $this->call_count++;
+        
+    }
+    
+    // Method to test whether the given expression is closer to the answer than the previous
+    // one. Later we check if it's actually equal to it.
+    private function isBetterSolutionFound( $this_answer, $is_valid, $this_solution, $current_positions, $current_operators, $num_operators_used ) {
         // We have the value of this expression. If it's an integer, see if it's closer than the previous best.
         if ( $is_valid ) {
             // If there isn't a previous best, then by definition this is the best so far.
             if ( NULL == $this->best_answer ||
-                 ( abs( $this->target_number - $expr ) < abs( $this->target_number - $this->best_answer ) )
+                 ( abs( $this->target_number - $this_answer ) < abs( $this->target_number - $this->best_answer ) )
                ) {
                 // Yes, we've found a better answer.
-                $this->best_answer = $expr;
-                $this->best_solution = array( 'positions' => $positions, 'operators' => $operators, 'solution' => $solution );
-echo '<br />Best so far: ' . $this->best_answer . '; ' . $solution;
+                $this->best_answer = $this_answer;
+                $this->best_solution = array();
+                $this->best_solution['positions'] = $current_positions;
+                $this->best_solution['operators'] = $current_operators;
+                $this->best_solution['num_operators'] = $num_operators_used;
+                $this->best_solution['solution'] = $this_solution;
+                if ( 2 < $this->debug_level ) {
+                    echo '<br />Best so far: ' . $this->best_answer . '; ' . $this_solution;
+                }
             }
         }
-
-        $this->call_count++;
-        
+    }
+    
+    // Method to return TRUE if the best answer so far is equal to the target.
+    private function areWeFinished() {
+        $success = ( NULL != $this->best_answer && $this->best_answer == $this->target_number );
+        return $success;
     }
     
     // Methods to retrieve information about the outcome.
@@ -189,6 +209,12 @@ echo '<br />Best so far: ' . $this->best_answer . '; ' . $solution;
     
     // Method to return the value of the expression of the best answer.
     public function getBestAnswer() {
+        // If we hit the target, and the debugging level is high enough, dump out all the information to screen.
+        if ( $this->areWeFinished() && 3 < $this->debug_level ) {
+            echo '<p ><pre >';
+            print_r( $this->best_solution );
+            echo '</pre></p>';
+        }
         return $this->best_answer;
     }
     

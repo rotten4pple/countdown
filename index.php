@@ -159,7 +159,7 @@ function process_form() {
     
     require_once( './CountdownProblem.php' );
     $solution = new CountdownProblem( $_POST['target_number'], $_POST['given_number'] );
-    $solution->solve( 5 );
+    $solution->solve( 3 );
     
     // Okay, let's see what we've ended up with.
     echo '<p >';
