@@ -18,3 +18,5 @@ My goals are:
 1. find a solution as efficiently as possible
 1. make the code as elegant as possible
 1. make the front-end user friendly, maybe with AJAX and whatnot
+
+[An example of this project in action](http://54.76.79.117:83/)
