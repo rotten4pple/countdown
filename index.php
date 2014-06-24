@@ -43,6 +43,22 @@ for( $i = 0 ; $i < 6 ; $i++ ) {
     echo ( 1 + $i ) . ': <input type="text" name="given_number[' . $i . ']" maxlength="3" class="number" value="' . $form_values['user_numbers'][$i] . '" /> ';
 }
 
+$allowed_debug_levels = array(
+    0 => 'None',
+    3 => 'A nice amount',
+    4 => 'Full details of best solution',
+    5 => 'Every calculation - be careful',
+    8 => 'Details of every calculation - be very, very careful'
+);
+echo '<p >';
+echo 'Select the debug level: <select name="debug_lvl" >';
+foreach( $allowed_debug_levels as $allowed_debug_level => $level_description ) {
+    $selected = ( $allowed_debug_level == $form_values['debug_level'] ? 'selected="selected" ' : '' );
+    echo '<option value="' . $allowed_debug_level . '" ' . $selected . '>' . $allowed_debug_level . ' - ' . $level_description . '</option>';
+}
+echo '</select>';
+echo '</p>';
+
 ?>
 
 <p >
@@ -91,6 +107,7 @@ function fill_in_gaps() {
     for( $i = 0 ; $i < 6 ; $i++ ) {
         $form_fields['user_numbers'][$i] = NULL;
     }
+    $form_fields['debug_level'] = 3;  // Default to 3, as it's a nice level.
     $form_fields['submitted'] = FALSE;
     $form_fields['any_gaps'] = FALSE;
     // If user clicked "clear", we stop at this point.
@@ -105,7 +122,7 @@ function fill_in_gaps() {
             $form_fields['any_gaps'] = TRUE;
             $form_fields['target'] = rand( 100, 999 );
         }
-        $form_fields['top_line'] = ( array_key_exists( 'top_line', $_POST ) ? $_POST['top_line'] : '' );
+        $form_fields['top_line'] = ( array_key_exists( 'top_line', $_POST ) ? $_POST['top_line'] : '1' );
         
         // We need to count how many of the numbers submitted in the form are in the set 1-10, and
         // how many are 25, 50, 75 or 100. We also count how many are in neither!
@@ -127,7 +144,6 @@ function fill_in_gaps() {
             }
         }
         
-        
         for( $i = 0 ; $i < 6 ; $i++ ) {
             if ( array_key_exists( 'given_number', $_POST ) &&
                  array_key_exists( $i, $_POST['given_number'] ) &&
@@ -148,6 +164,8 @@ function fill_in_gaps() {
                 }
             }
         }
+        
+        $form_fields['debug_level'] = ( array_key_exists( 'debug_lvl', $_POST ) ? $_POST['debug_lvl'] : '3' );
     }
     
     return $form_fields;
@@ -159,7 +177,8 @@ function process_form() {
     
     require_once( './CountdownProblem.php' );
     $solution = new CountdownProblem( $_POST['target_number'], $_POST['given_number'] );
-    $solution->solve( 3 );
+    $use_level = ( isset( $_POST['debug_lvl'] ) && 0 <= $_POST['debug_lvl'] ) ? $_POST['debug_lvl'] : 0;
+    $solution->solve( $use_level );
     
     // Okay, let's see what we've ended up with.
     echo '<p >';
