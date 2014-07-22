@@ -47,7 +47,7 @@ $allowed_debug_levels = array(
     0 => 'None',
     3 => 'A nice amount',
     4 => 'Full details of best solution',
-    5 => 'Every calculation - be careful',
+    5 => 'Calculations being excluded - be careful',
     8 => 'Details of every calculation - be very, very careful'
 );
 echo '<p >';
@@ -178,7 +178,7 @@ function process_form() {
     require_once( './CountdownProblem.php' );
     $solution = new CountdownProblem( $_POST['target_number'], $_POST['given_number'] );
     $use_level = ( isset( $_POST['debug_lvl'] ) && 0 <= $_POST['debug_lvl'] ) ? $_POST['debug_lvl'] : 0;
-    $solution->solve( $use_level );
+    $solution->solve2( $use_level );
     
     // Okay, let's see what we've ended up with.
     echo '<p >';

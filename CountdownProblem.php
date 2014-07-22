@@ -27,159 +27,149 @@ class CountdownProblem {
     }
     
     /*
-    ** This method attempts to solve the problem. It stores the outcome (TRUE/FALSE)
-    ** and all the information about the solution.
-    ** The debug level determines how much internal working is output (0 = none, 9 = lots).
+    ** This is the 2nd generation solver. It is much more efficient and actually much simpler than the first
+    ** attempt at a solution. It can cope with any number of "given numbers" (within reason).
     */
-    public function solve( $debug_level = 0 ) {
+    public function solve2( $debug_level = 0 ) {
+        
+        // Set the maximum page load time to 5 minutes.
+        set_time_limit( 300 );
         
         // Store the debug level internally. If not valid, assume 0.
         // @TODO: if the debug lever is greater than, say 5, output to a file - you can imagine how much stuff there'll be!
         $this->debug_level = ( is_numeric( $debug_level ) && 0 <= $debug_level && 9 >= $debug_level ) ? $debug_level : 0;
         
+        // We need the actual numbers so that we can evaluate the calculations
+        // We need the expressions that generate those numbers, so that we can report back to the user.
+        // In the top-level call, the expressions are just the numbers.
+        $seedNumbers = array( 'values' => $this->given_numbers, 'expressions' => $this->given_numbers );
+        
         // Remember what time we started.
         $start_time = microtime( TRUE );  // TRUE means return it as a float.
         
-        // Okay, the first attempt at a solution will use each number once, and it won't do any fancy brackets.
-        // It will just position the numbers in the 6! combinations, and they try every combination of +, -, * /
-        // between them. Yes, that's 6! * 4^5 = ~750,000 combinations.
-        // Generate 6 numbers; the nth number is the position of the nth given number.
-        // Note: it feels like there should be a better way of doing this, but I can't think of it.
-        for( $i0 = 0 ; $i0 < 6 ; $i0++ ) {
-            for( $i1 = 0 ; $i1 < 6 ; $i1++ ) {
-                if ( $i0 != $i1 ) {
-                    for( $i2 = 0 ; $i2 < 6 ; $i2++ ) {
-                        if ( $i0 != $i2 && $i1 != $i2 ) {
-                            for( $i3 = 0 ; $i3 < 6 ; $i3++ ) {
-                                if ( $i0 != $i3 && $i1 != $i3 && $i2 != $i3 ) {
-                                    for( $i4 = 0 ; $i4 < 6 ; $i4++ ) {
-                                        if ( $i0 != $i4 && $i1 != $i4 && $i2 != $i4 && $i3 != $i4 ) {
-                                            for( $i5 = 0 ; $i5 < 6 ; $i5++ ) {
-                                                if ( $i0 != $i5 && $i1 != $i5 && $i2 != $i5 && $i3 != $i5 && $i4 != $i5 ) {
-                                                    // Call another method to continue...
-                                                    $this->process_number_combo( array( $i0, $i1, $i2, $i3, $i4, $i5 ) );
-                                                    // If we finished, skip to the end.
-                                                    if ( $this->areWeFinished() ) {
-                                                        break 6;  // Break out of all the for loops.
-                                                    }
-                                                }
-                                            }
+        // Start the whole process.
+        $this->combineTwo( $this->target_number, $seedNumbers );
+        
+        // Get the finish time and save the difference.
+        $end_time = microtime( TRUE );  // TRUE means return it as a float.
+        $this->time_taken = round( $end_time - $start_time, 3 );
+    }
+    
+    // Method that takes the target and an array of numbers. It takes every pair of numbers and for each pair, every
+    // operator, and where it's worth doing it applies the operator to the two numbers. It then replaces the two
+    // original numbers in the array and adds the result. It then calls itself again.
+    // If the result is equal to the target, it stops the whole thing.
+    private function combineTwo( $target, $remaining_numbers ) {
+        if ( 1 < count( $remaining_numbers['values'] ) ) {
+            for( $i = 0 ; $i < count( $remaining_numbers['values'] ) ; $i++ ) {
+                for( $j = 0 ; $j < count( $remaining_numbers['values'] ) ; $j++ ) {
+                    // Combine the ith and jth numbers with each operator, and call ourselves recursively.
+                    if ( $i != $j ) {
+                        $operators = array( '+', '-', '*', '/' );
+                        $op1 = $remaining_numbers['values'][ $i ];
+                        $op2 = $remaining_numbers['values'][ $j ];
+                        foreach( $operators as $opidx => $operator ) {
+                            // There are a few things that are not worth pursuing, so we test for them here.
+                            // They are:
+                            //   Dividing by zero
+                            //   Trying "b + a" or "b * a" when we've previously done "a + b" or "a * b"
+                            //   Trying "b <op> a" where a=b and we've done "a <op> b"
+                            //   Multiplying or dividing by 1
+                            $try_this = TRUE;
+                            if ( '/' == $operator && 0 == $op2 ) {
+                                if ( 4 < $this->debug_level ) {
+                                    echo "<br />Not attempting to divide by zero.";
+                                }
+                                // Division by zero.
+                                $try_this = FALSE;
+                            } elseif ( $j < $i &&
+                                       ( '+' == $operator || '*' == $operator ) ) {
+                                if ( 4 < $this->debug_level ) {
+                                    echo "<br />Already done " . $op1 . " " . $operator . " " . $op2 . " the other way round.";
+                                }
+                                // Doing a commutative operation the other way round.
+                                $try_this = FALSE;
+                            } elseif ( $op1 == $op2 &&
+                                       $j < $i ) {
+                                if ( 4 < $this->debug_level ) {
+                                    echo "<br />Not doing " . $op1 . " " . $operator . " " . $op2 . " again.";
+                                }
+                                // Doing any operation the other way round when the operands are equal.
+                                $try_this = FALSE;
+                            } elseif ( ( ( 1 == $op1 || 1 == $op2 ) &&
+                                         ( '*' == $operator ) ) ||
+                                       ( 1 == $op2 && '/' == $operator ) ) {
+                                if ( 4 < $this->debug_level ) {
+                                    echo "<br />Not multiplying by 1.";
+                                }
+                                // Multiplying or dividing by 1
+                                $try_this = FALSE;
+                            }
+                            if ( $try_this ) {
+                                $is_valid = TRUE;
+                                switch( $operator ) {
+                                    case '+':
+                                        $new_value = $op1 + $op2;
+                                        break;
+                                    case '-':
+                                        $new_value = $op1 - $op2;
+                                        // It's not valid if the answer is zero.
+                                        $is_valid = ( 0 != $new_value );
+                                        break;
+                                    case '*':
+                                        $new_value = $op1 * $op2;
+                                        break;
+                                    case '/':
+                                        $new_value = $op1 / $op2;
+                                        // It's only valid if the result is an integer.
+                                        $is_valid = ( $new_value == floor( $new_value ) );
+                                        break;
+                                }
+                                
+                                // If anything is wrong, move on to the next operator/numbers.
+                                if ( $is_valid ) {
+                                    
+                                    // Build the expression for the new value. It's just "( <expr1> <operator> <expr2> )".
+                                    $new_expr = '( ' . $remaining_numbers['expressions'][ $i ] . ' ' . $operator . ' ' . $remaining_numbers['expressions'][ $j ] . ' )';
+                                    
+                                    // As this is valid, increment the call count.
+                                    $this->call_count++;
+                                    
+                                    // See if this one value/expression is better than all previous ones.
+                                    $this->isBetterSolutionFound( $new_value, $is_valid, $new_expr );
+                                    
+                                    // If we haven't hit the target, continue.
+                                    if ( $this->areWeFinished() ) {
+                                        break 3;
+                                    }
+                                    
+                                    // Build the new set of numbers to pass in.
+                                    $rem_nums = array( 'values' => array( $new_value ), 'expressions' => array( $new_expr ) );
+                                    for( $ridx = 0 ; $ridx < count( $remaining_numbers['values'] ) ; $ridx++ ) {
+                                        if ( $ridx != $i && $ridx != $j ) {
+                                            $rem_nums['values'][] = $remaining_numbers['values'][$ridx];
+                                            $rem_nums['expressions'][] = $remaining_numbers['expressions'][$ridx];
                                         }
                                     }
+                                    $this->combineTwo( $target, $rem_nums );
                                 }
                             }
                         }
                     }
                 }
             }
+            
         }
-        $end_time = microtime( TRUE );  // TRUE means return it as a float.
-        $this->time_taken = round( $end_time - $start_time, 3 );
-    }
-    
-    // Method that receives 6 positions. We then generate the 4^5 combinations of operators and apply
-    // them to see what number we get. If this answer is closer to the target than anything before,
-    // remember this answer and all the combinations.
-    private function process_number_combo( $positions ) {
-        // If the debug level is fairly high, dump the arrangement of the positions.
-        if ( 7 < $this->debug_level ) {
-            $pos_dump = '';
-            for( $pidx = 0 ; $pidx < 6 ; $pidx++ ) {
-                $pos_dump .= $positions[$pidx] . ' ';
-            }
-            $pos_dump = rtrim( $pos_dump );
-            echo '<br />' . $pos_dump;
-        }
-        
-        // We need 5 nested counters to go from 0 to 3 to give us the operators.
-        for( $o0 = 0 ; $o0 < 4 ; $o0++ ) {
-            for( $o1 = 0 ; $o1 < 4 ; $o1++ ) {
-                for( $o2 = 0 ; $o2 < 4 ; $o2++ ) {
-                    for( $o3 = 0 ; $o3 < 4 ; $o3++ ) {
-                        for( $o4 = 0 ; $o4 < 4 ; $o4++ ) {
-                            $this->process_whole_expression( $positions, array( $o0, $o1, $o2, $o3, $o4 ) );
-                            // If we finished, skip to the end.
-                            // @TODO: Move this test into a separate method so we can call it everywhere.
-                            if ( $this->areWeFinished() ) {
-                                break 5;  // Break out of all the for loops.
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-    }
-    
-    // This method receives the 6 positions and the 5 operators.
-    // It evaluates the expression - ie ( ( ( p1 o1 p2 ) o2 p3 ) o3 p4 )....
-    // If the answer is an integer and is closer than any previous expression, then remember everything.
-    private function process_whole_expression( $positions, $operators ) {
-        $op_to_text = array( 0 => '+', 1 => '-', 2 => '*', 3 => '/' );
-        
-        // If the debug level is fairly high, dump the combination of operators.
-        if ( 7 < $this->debug_level ) {
-            $op_dump = '';
-            for( $oidx = 0 ; $oidx < 5 ; $oidx++ ) {
-                $op_dump .= $op_to_text[$operators[$oidx]] . ' ';
-            }
-            $op_dump = rtrim( $op_dump );
-            echo '<br />' . $op_dump;
-        }
-        
-        // We have to handle a division by zero. If it happens, we ignore the answer.
-        // We also ignore the answer if it's a non-integer during the process.
-        // We test the value of the expression all the through the calculation, because we might be able
-        // to hit it without using all the given numbers.
-        $is_valid = TRUE;
-        $expr = $this->given_numbers[$positions[0]];
-        $solution = $expr;
-        $debug3 = '<br />This expression: ' . $expr;
-        $this->isBetterSolutionFound( $expr, TRUE, $solution, $positions, $operators, 0 );
-        for( $oidx = 0 ; $oidx < 5 ; $oidx++ ) {
-            $next_part = $this->given_numbers[$positions[1 + $oidx]];
-            $solution = '( ' . $solution . ' ' . $op_to_text[$operators[$oidx]] . ' ' . $next_part . ' )';
-            switch( $operators[$oidx] ) {
-                case 0:  // Plus
-                    $debug3 .= ' + ';
-                    $expr = $expr + $next_part;
-                    break;
-                case 1:  // Minus
-                    $debug3 .= ' - ';
-                    $expr = $expr - $next_part;
-                    break;
-                case 2:  // Times
-                    $debug3 .= ' * ';
-                    $expr = $expr * $next_part;
-                    break;
-                case 3:  // Divide
-                    if ( 0 == $next_part ) {
-                        $debug3 .= ' !! ';
-                        $is_valid = FALSE;
-                    } else {
-                        $debug3 .= ' / ';
-                        $expr = $expr / $next_part;
-                    }
-                    break;
-            }
-            $debug3 .= $next_part;
-            $is_valid = $is_valid && ( $expr == floor( $expr ) );
-            $this->isBetterSolutionFound( $expr, $is_valid, $solution, $positions, $operators, 1 + $oidx );
-        }
-        if ( 4 < $this->debug_level ) {
-            echo $debug3;
-            echo ' gives: ' . $expr;
-        }
-        
-        $this->call_count++;
-        
     }
     
     // Method to test whether the given expression is closer to the answer than the previous
     // one. Later we check if it's actually equal to it.
-    private function isBetterSolutionFound( $this_answer, $is_valid, $this_solution, $current_positions, $current_operators, $num_operators_used ) {
+    private function isBetterSolutionFound( $this_answer, $is_valid, $this_solution ) {
         // We have the value of this expression. If it's an integer, see if it's closer than the previous best.
         if ( $is_valid ) {
+            if ( 7 < $this->debug_level ) {
+                echo '<br />Testing this expression: ' . $this_answer . ' = ' . $this_solution;
+            }
             // If there isn't a previous best, then by definition this is the best so far.
             if ( NULL == $this->best_answer ||
                  ( abs( $this->target_number - $this_answer ) < abs( $this->target_number - $this->best_answer ) )
@@ -187,9 +177,6 @@ class CountdownProblem {
                 // Yes, we've found a better answer.
                 $this->best_answer = $this_answer;
                 $this->best_solution = array();
-                $this->best_solution['positions'] = $current_positions;
-                $this->best_solution['operators'] = $current_operators;
-                $this->best_solution['num_operators'] = $num_operators_used;
                 $this->best_solution['solution'] = $this_solution;
                 if ( 2 < $this->debug_level ) {
                     echo '<br />Best so far: ' . $this->best_answer . '; ' . $this_solution;
@@ -241,10 +228,5 @@ class CountdownProblem {
     }
     
 }
-
-
-
-
-
 
 ?>
